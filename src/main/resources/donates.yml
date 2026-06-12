@@ -1,0 +1,40 @@
+# ╔══════════════════════════════╗
+# ║   YoPayment — donates.yml    ║
+# ╚══════════════════════════════╝
+#
+# Формат:
+#   <id>:
+#     display-name: <название товара для показа игроку>
+#     price: <цена в рублях, дробное число>
+#     description: <описание для ЮKassa, до 128 символов, опционально>
+#     commands:
+#       - "консольная команда"
+#
+# Плейсхолдер в командах:
+#   %player% — имя целевого игрока (для которого создан платёж)
+#
+# Команды выполняются от имени консоли при статусе платежа succeeded.
+
+donates:
+  vip:
+    display-name: "VIP"
+    price: 30.0
+    description: "Покупка привилегии VIP"
+    commands:
+      - "lp user %player% parent add vip"
+      - 'tellraw @a [{"text":"[","color":"gray"},{"text":"Покупка","color":"green"},{"text":"] ","color":"gray"},{"text":"Игрок ","color":"white"},{"text":"%player%","color":"green"},{"text":" купил привилегию ","color":"yellow"},{"text":"VIP","color":"yellow"},{"text":" на сайте ","color":"white"},{"text":"example.com","color":"yellow","underlined":true,"clickEvent":{"action":"open_url","value":"https://example.com"}},{"text":".","color":"white"}]'
+
+  premium:
+    display-name: "Premium"
+    price: 60.0
+    description: "Покупка привилегии Premium"
+    commands:
+      - "lp user %player% parent add premium"
+
+  100_points:
+    display-name: "100 поинтов"
+    price: 100.0
+    description: "Покупка 100 поинтов"
+    commands:
+      - "p give %player% 100"
+      - "bc Оплата прошла успешно!"

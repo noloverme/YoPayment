@@ -1,0 +1,71 @@
+# ╔══════════════════════════════╗
+# ║   YoPayment — messages.yml   ║
+# ╚══════════════════════════════╝
+
+prefix: "&#27ae60[&#00bfffYoPayment&#27ae60] "
+
+# --- Создание платежа ---
+
+payment-created: |
+  &#27ae60Ссылка для оплаты создана!
+  &#a0a0a0Товар: &#ffff00{display_name}
+  &#a0a0a0Цена: &#ffd700{price} ₽
+  &#a0a0a0Ссылка действует {timeout} мин.
+
+payment-created-for-other: |
+  &#27ae60Ссылка создана для игрока &#ffff00{player}&#27ae60!
+  &#a0a0a0Товар: &#ffff00{display_name}
+  &#a0a0a0Цена: &#ffd700{price} ₽
+
+payment-success: "&#27ae60✔ Оплата товара &#ffff00{display_name}&#27ae60 прошла успешно! Спасибо!"
+
+payment-failed: "&#ff0000✘ Оплата товара &#ffff00{display_name}&#ff0000 была отменена или истекла."
+
+# --- Ошибки ---
+
+item-not-found: "&#ff0000Товар &#ffff00{item}&#ff0000 не найден. Доступные: &#ffff00{items}"
+player-not-found: "&#ff0000Игрок &#ffff00{player}&#ff0000 не найден."
+no-permission: "&#ff0000Недостаточно прав."
+payment-error: "&#ff0000Не удалось создать платёж. Обратитесь к администратору."
+only-player: "&#ff0000Эта команда доступна только игрокам."
+unknown-subcommand: "&#ff0000Неизвестная подкоманда. Используйте /yopayment"
+
+# --- Reload ---
+
+config-reloaded: "&#27ae60✔ Конфигурация YoPayment перезагружена."
+
+# --- Список активных платежей ---
+
+list-active-header: "&#ffff00━━━ Активные оплаты ━━━"
+list-active-entry: " &#555555• &#ffffff{payment_id} &#555555| &#a0a0a0Товар: &#ffff00{display_name} &#555555| &#a0a0a0Игрок: &#27ae60{player} &#555555| &#a0a0a0Цена: &#ffd700{price} ₽"
+list-active-empty: "&#a0a0a0Нет активных оплат."
+
+# --- Список покупок игрока ---
+
+list-player-header: "&#ffff00━━━ Покупки игрока {player} ━━━"
+list-player-entry: " &#555555• &#ffffff{payment_id} &#555555| &#a0a0a0Товар: &#ffff00{display_name} &#555555| &#a0a0a0Цена: &#ffd700{price} ₽ &#555555| &#a0a0a0Статус: {status} &#555555| &#a0a0a0Дата: &#ffffff{date}"
+list-player-empty: "&#a0a0a0У игрока &#ffff00{player}&#a0a0a0 нет покупок."
+
+# --- Локализация статусов ---
+
+status-pending: "&#ffff00Ожидание"
+status-succeeded: "&#27ae60Оплачено"
+status-canceled: "&#ff0000Отменено"
+status-waiting_for_capture: "&#ffd700Ожидание списания"
+
+# --- Справка и ошибки команд ---
+
+help: |
+  &#ffff00━━━ YoPayment — справка ━━━
+  &#a0a0a0▸ &#ffffff/yopayment create <товар> [игрок] &#555555— создать ссылку
+  &#a0a0a0▸ &#ffffff/yopayment reload &#555555— перезагрузить конфиг
+  &#a0a0a0▸ &#ffffff/yopayment list active &#555555— активные оплаты
+  &#a0a0a0▸ &#ffffff/yopayment list <игрок> &#555555— покупки игрока
+
+unknown-command: "&#ff0000Неизвестная команда: {command}"
+
+create-usage: "&#ff0000Использование: /yopayment create <товар> [игрок]"
+
+create-items: "&#a0a0a0Доступные товары: &#ffff00{items}"
+
+list-usage: "&#ff0000Использование: /yopayment list <active|игрок>"

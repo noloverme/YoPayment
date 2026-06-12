@@ -1,0 +1,93 @@
+# ╔══════════════════════════════╗
+# ║   YoPayment — config.yml     ║
+# ╚══════════════════════════════╝
+
+# Настройки API ЮKassa
+yookassa:
+  # Идентификатор магазина (shopId) из личного кабинета ЮKassa
+  shop-id: "000000"
+  # Секретный ключ из личного кабинета ЮKassa
+  secret-key: "test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  # URL, на который пользователь вернётся после оплаты
+  return-url: "https://pay.noloverme.xyz/"
+
+# Интервал проверки статуса платежей (в секундах)
+check-interval: 5
+
+# Время жизни отслеживаемого платежа (в минутах).
+# Если за это время платёж не перешёл в succeeded/canceled — плагин перестаёт его отслеживать.
+payment-timeout: 10
+
+# Формат сообщения при создании ссылки оплаты
+# Доступные плейсхолдеры: {display_name}, {price}, {url}
+# Примеры:
+#   - "{url}" - только ссылка
+#   - "{display_name} - {price} ₽" - название и цена
+#   - "{display_name} ({price} ₽): {url}" - название, цена и ссылка
+message-format: "&7[&#00bfffОплата&7] &fТовар: &#00bfff{display_name}\n&fЦена: &#00bfff{price}₽\n&fСсылка для оплаты: &#00bfff{url}"
+
+# Режим тихого логирования (only errors)
+# true - показывать только ошибки
+# false - показывать все логи
+silent-mode: true
+
+# База данных. Поддерживаемые типы: h2, mysql, postgresql
+database:
+  type: h2
+
+  h2:
+    # Имя файла БД (без расширения), хранится в папке плагина
+    file: "yopayment"
+
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "yopayment"
+    username: "root"
+    password: "password"
+    pool-size: 10
+
+  postgresql:
+    host: "localhost"
+    port: 5432
+    database: "yopayment"
+    username: "postgres"
+    password: "password"
+    pool-size: 10
+
+# ╔══════════════════════════════════════════════════════════╗
+# ║   PlaceholderAPI Интеграция                             ║
+# ╚══════════════════════════════════════════════════════════╝
+
+# ТРЕБУЕТСЯ: PlaceholderAPI плагин на сервере
+
+# Доступные плейсхолдеры:
+
+# %YoPayment_Link%
+# Показывает последнюю рабочую ссылку для оплаты игрока
+# Если ссылки нет — выводит "N/A"
+# Пример: https://yookassa.ru/payments/...
+#
+# Использование: /tell %player% %YoPayment_Link%
+
+# %YoPayment_Custom:<format>%
+# Настраиваемый плейсхолдер для вывода информации о последнем платеже
+# ПОДДЕРЖИВАЕТ HEX и & цвета (&#RRGGBB и &c)
+#
+# Доступные переменные:
+#   {display_name}  - Название товара (из донатов)
+#   {item}          - ID товара
+#   {price}         - Цена товара (форматированная)
+#   {description}   - Описание товара
+#   {link}          - Ссылка для оплаты (или N/A)
+#   {status}        - Статус платежа (pending, succeeded, canceled)
+#   {created_at}    - Дата создания платежа
+#
+# Примеры использования:
+#   %YoPayment_Custom:&#00bfffПоследняя покупка: {display_name} ({price})%
+#   %YoPayment_Custom:&cСтатус: &e{status}, &cссылка: &b{link}%
+#   %YoPayment_Custom:&#ff6b6b{description} - &#4ecdc4{price} руб.%
+#
+# Примеры в других плагинах (e.g. PlaceholderAPI в motd или другие):
+#   В scoreboard: /scoreboard objectives setdisplay sidebar YourObjective
+#   Если плагин поддерживает PlaceholderAPI, просто добавь плейсхолдер в сообщение
