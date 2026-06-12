@@ -6,20 +6,20 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /**
  * Базовая реализация DatabaseManager для SQL-баз данных.
+ * Использует только PreparedStatements для предотвращения SQL-инъекций.
  */
 public abstract class AbstractSQLDatabase implements DatabaseManager {
     protected HikariDataSource dataSource;
     protected final Logger logger;
-    private final Thread executor;
 
     public AbstractSQLDatabase(Logger logger) {
         this.logger = logger;
-        this.executor = Thread.currentThread();
         this.dataSource = null;
     }
 
@@ -60,6 +60,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
         config.setConnectionTimeout(10000);
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
+        config.setLeakDetectionThreshold(60000);
         return new HikariDataSource(config);
     }
 
@@ -100,7 +101,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
 
     @Override
     public void savePayment(PaymentRecord record, Runnable onComplete) {
-        new Thread(() -> {
+        CompletableFuture.runAsync(() -> {
             String sql = """
                 INSERT INTO yop_payments (
                     payment_id, player_name, player_uuid, item_id, price, status,
@@ -124,12 +125,12 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
             } catch (SQLException e) {
                 logger.severe("[YoPayment] Failed to save payment: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
     @Override
     public void updatePaymentStatus(String paymentId, String status, LocalDateTime completedAt, Runnable onComplete) {
-        new Thread(() -> {
+        CompletableFuture.runAsync(() -> {
             String sql = "UPDATE yop_payments SET status = ?, completed_at = ? WHERE payment_id = ?";
 
             try (Connection conn = getDataSource().getConnection();
@@ -142,32 +143,34 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
             } catch (SQLException e) {
                 logger.severe("[YoPayment] Failed to update payment status: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
     @Override
     public void getActivePayments(Consumer<List<PaymentRecord>> callback) {
-        new Thread(() -> {
-            String sql = "SELECT * FROM yop_payments WHERE status = 'pending'";
+        CompletableFuture.runAsync(() -> {
+            String sql = "SELECT * FROM yop_payments WHERE status = ? ORDER BY created_at DESC";
             List<PaymentRecord> records = new ArrayList<>();
 
             try (Connection conn = getDataSource().getConnection();
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
-                while (rs.next()) {
-                    records.add(mapResultSet(rs));
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, "pending");
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        records.add(mapResultSet(rs));
+                    }
                 }
             } catch (SQLException e) {
                 logger.severe("[YoPayment] Failed to get active payments: " + e.getMessage());
             }
 
             if (callback != null) callback.accept(records);
-        }).start();
+        });
     }
 
     @Override
     public void getPaymentsByPlayer(String playerName, Consumer<List<PaymentRecord>> callback) {
-        new Thread(() -> {
+        CompletableFuture.runAsync(() -> {
             String sql = "SELECT * FROM yop_payments WHERE player_name = ? ORDER BY created_at DESC";
             List<PaymentRecord> records = new ArrayList<>();
 
@@ -184,12 +187,12 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
             }
 
             if (callback != null) callback.accept(records);
-        }).start();
+        });
     }
 
     @Override
     public void getPayment(String paymentId, Consumer<Optional<PaymentRecord>> callback) {
-        new Thread(() -> {
+        CompletableFuture.runAsync(() -> {
             String sql = "SELECT * FROM yop_payments WHERE payment_id = ?";
             Optional<PaymentRecord> result = Optional.empty();
 
@@ -206,7 +209,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
             }
 
             if (callback != null) callback.accept(result);
-        }).start();
+        });
     }
 
     protected PaymentRecord mapResultSet(ResultSet rs) throws SQLException {

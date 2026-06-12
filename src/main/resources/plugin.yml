@@ -2,32 +2,53 @@ name: YoPayment
 version: '1.0a'
 main: com.noloverme.yopayment.YoPaymentPlugin
 api-version: '1.16'
-author: noloverme
+authors:
+  - noloverme
 description: Создание ссылок для оплаты через ЮKassa
-softdepend: ["PlaceholderAPI"]
 
+softdepend:
+  - PlaceholderAPI
+
+# Команды плагина
 commands:
   yopayment:
     description: Основная команда плагина YoPayment
     usage: /yopayment <create|reload|list> [аргументы]
-    aliases: [yp, yopay]
+    aliases:
+      - yp
+      - yopay
+    permission: yopayment.use
 
+# Разрешения
 permissions:
+  yopayment.use:
+    description: Основное разрешение на использование плагина
+    default: false
+
   yopayment.create:
     description: Создание платёжных ссылок для себя
     default: op
+    parent: yopayment.use
+
   yopayment.create.others:
     description: Создание платёжных ссылок для других игроков
     default: op
+    parent: yopayment.create
+
   yopayment.reload:
-    description: Перезагрузка конфигурации
+    description: Перезагрузка конфигурации плагина
     default: op
+    parent: yopayment.use
+
   yopayment.list:
-    description: Просмотр списка оплат
+    description: Просмотр списка активных платежей
     default: op
+    parent: yopayment.use
+
   yopayment.list.others:
     description: Просмотр покупок других игроков
     default: op
+    parent: yopayment.list
 
 libraries:
   - com.zaxxer:HikariCP:7.0.2

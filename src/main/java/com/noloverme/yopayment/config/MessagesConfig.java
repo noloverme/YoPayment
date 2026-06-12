@@ -176,6 +176,10 @@ public class MessagesConfig {
         return get("list-usage");
     }
 
+    public String invalidPlayerName(String player) {
+        return get("invalid-player-name", Map.of("player", player));
+    }
+
     public String getLocalizedStatus(String status) {
         return switch (status) {
             case "pending" -> statusPending();

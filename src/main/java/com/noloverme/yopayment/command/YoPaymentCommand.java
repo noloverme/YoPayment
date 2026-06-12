@@ -9,6 +9,7 @@ import com.noloverme.yopayment.database.DatabaseManager;
 import com.noloverme.yopayment.model.DonateItem;
 import com.noloverme.yopayment.model.PaymentRecord;
 import com.noloverme.yopayment.api.model.PaymentResponse;
+import com.noloverme.yopayment.security.CommandValidator;
 import com.noloverme.yopayment.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -24,11 +25,11 @@ import java.util.stream.Collectors;
 
 /**
  * Обработчик команды /yopayment.
+ * Поддерживает создание платежей, перезагрузку конфига и просмотр платежей.
  */
 public class YoPaymentCommand implements CommandExecutor, TabCompleter {
     private final DatabaseManager database;
     private final YooKassaClient yooKassaClient;
-    private final MainConfig mainConfig;
     private final MessagesConfig messages;
     private final DonatesConfig donates;
     private final int paymentTimeout;
@@ -39,7 +40,6 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
                             int paymentTimeout, Logger logger) {
         this.database = database;
         this.yooKassaClient = yooKassaClient;
-        this.mainConfig = mainConfig;
         this.messages = messages;
         this.donates = donates;
         this.paymentTimeout = paymentTimeout;
@@ -74,6 +74,9 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         };
     }
 
+    /**
+     * Обрабатывает создание платежа с валидацией входных данных.
+     */
     private boolean handleCreate(CommandSender sender, String[] args) {
         if (!sender.hasPermission("yopayment.create")) {
             sendMessage(sender, messages.noPermission());
@@ -111,57 +114,74 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
             targetPlayer = ((Player) sender).getName();
         }
 
+        // Валидируем имя игрока
+        if (!CommandValidator.isValidPlayerName(targetPlayer)) {
+            sendMessage(sender, messages.invalidPlayerName(targetPlayer));
+            return true;
+        }
+
         String createdBy = sender instanceof Player ? ((Player) sender).getName() : "Console";
         DonateItem donateItem = item.get();
 
-        new Thread(() -> {
-            try {
-                PaymentResponse response = yooKassaClient.createPayment(donateItem, targetPlayer);
-
-                PaymentRecord record = new PaymentRecord(
-                    response.id(),
-                    targetPlayer,
-                    null,
-                    donateItem.id(),
-                    donateItem.price(),
-                    response.status().getValue(),
-                    response.confirmationUrl(),
-                    LocalDateTime.now(),
-                    null,
-                    createdBy
-                );
-
-                database.savePayment(record, () -> {
-                    Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
-                        if (args.length >= 3) {
-                            sendMessage(sender, messages.paymentCreatedForOther(
-                                targetPlayer,
-                                donateItem.id(),
-                                donateItem.displayName(),
-                                TextUtil.formatPrice(donateItem.price())
-                            ));
-                        } else {
-                            sendMessage(sender, messages.paymentCreated(
-                                donateItem.id(),
-                                donateItem.displayName(),
-                                TextUtil.formatPrice(donateItem.price()),
-                                String.valueOf(paymentTimeout)
-                            ));
-                        }
-                        sendMessage(sender, "&#a0a0a0Ссылка: " + (response.confirmationUrl() != null ? response.confirmationUrl() : "error"));
-                    });
-                });
-            } catch (YooKassaClient.YooKassaException e) {
-                logger.severe("[YoPayment] Failed to create payment: " + e.getMessage());
+        // Создание платежа
+        yooKassaClient.createPayment(donateItem, targetPlayer)
+            .thenAccept(response -> handlePaymentCreated(sender, response, targetPlayer, donateItem, createdBy, args.length >= 3))
+            .exceptionally(ex -> {
+                logger.severe("[YoPayment] Failed to create payment: " + ex.getMessage());
                 Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
                     sendMessage(sender, messages.paymentError());
                 });
-            }
-        }).start();
+                return null;
+            });
 
         return true;
     }
 
+    /**
+     * Обрабатывает результат создания платежа.
+     */
+    private void handlePaymentCreated(CommandSender sender, PaymentResponse response, String targetPlayer,
+                                      DonateItem donateItem, String createdBy, boolean isForOther) {
+        PaymentRecord record = new PaymentRecord(
+            response.id(),
+            targetPlayer,
+            null,
+            donateItem.id(),
+            donateItem.price(),
+            response.status().getValue(),
+            response.confirmationUrl(),
+            LocalDateTime.now(),
+            null,
+            createdBy
+        );
+
+        database.savePayment(record, () -> {
+            Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
+                if (isForOther) {
+                    sendMessage(sender, messages.paymentCreatedForOther(
+                        targetPlayer,
+                        donateItem.id(),
+                        donateItem.displayName(),
+                        TextUtil.formatPrice(donateItem.price())
+                    ));
+                } else {
+                    sendMessage(sender, messages.paymentCreated(
+                        donateItem.id(),
+                        donateItem.displayName(),
+                        TextUtil.formatPrice(donateItem.price()),
+                        String.valueOf(paymentTimeout)
+                    ));
+                }
+                if (response.confirmationUrl() != null) {
+                    sendMessage(sender, "&#a0a0a0Ссылка: " + response.confirmationUrl());
+                }
+            });
+        });
+    }
+
+    /**
+     * Обрабатывает перезагрузку конфигурации с ошибками.
+     */
     private boolean handleReload(CommandSender sender) {
         if (!sender.hasPermission("yopayment.reload")) {
             sendMessage(sender, messages.noPermission());
@@ -178,11 +198,15 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
                 sendMessage(sender, "&#ff0000Плагин YoPayment не найден");
             }
         } catch (Exception e) {
+            logger.severe("Error reloading YoPayment config: " + e.getMessage());
             sendMessage(sender, "&#ff0000Ошибка при перезагрузке конфигурации: " + e.getMessage());
         }
         return true;
     }
 
+    /**
+     * Обрабатывает просмотр платежей.
+     */
     private boolean handleList(CommandSender sender, String[] args) {
         if (!sender.hasPermission("yopayment.list")) {
             sendMessage(sender, messages.noPermission());

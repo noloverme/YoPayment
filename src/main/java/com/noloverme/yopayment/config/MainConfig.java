@@ -4,7 +4,8 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Обёртка над config.yml.
+ * Обёртка над config.yml с поддержкой переменных окружения для чувствительных данных.
+ * Учётные данные могут быть установлены через ENV переменные для максимальной безопасности.
  */
 public class MainConfig {
     private final FileConfiguration config;
@@ -13,12 +14,24 @@ public class MainConfig {
         this.config = config;
     }
 
+    /**
+     * Получает значение с fallback на переменную окружения.
+     * Переменная окружения имеет приоритет над config.yml.
+     */
+    private String getWithEnvFallback(String configKey, String envKey, String defaultValue) {
+        String envValue = System.getenv(envKey);
+        if (envValue != null && !envValue.trim().isEmpty()) {
+            return envValue;
+        }
+        return config.getString(configKey, defaultValue);
+    }
+
     public String getShopId() {
-        return config.getString("yookassa.shop-id", "000000");
+        return getWithEnvFallback("yookassa.shop-id", "YOOKASSA_SHOP_ID", "");
     }
 
     public String getSecretKey() {
-        return config.getString("yookassa.secret-key", "test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+        return getWithEnvFallback("yookassa.secret-key", "YOOKASSA_SECRET_KEY", "");
     }
 
     public String getReturnUrl() {
@@ -51,23 +64,31 @@ public class MainConfig {
     }
 
     public String getDatabaseMySqlHost() {
-        return config.getString("database.mysql.host", "localhost");
+        return getWithEnvFallback("database.mysql.host", "MYSQL_HOST", "localhost");
     }
 
     public int getDatabaseMySqlPort() {
+        String envPort = System.getenv("MYSQL_PORT");
+        if (envPort != null && !envPort.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(envPort);
+            } catch (NumberFormatException e) {
+                // Fallback на конфиг
+            }
+        }
         return config.getInt("database.mysql.port", 3306);
     }
 
     public String getDatabaseMySqlName() {
-        return config.getString("database.mysql.database", "yopayment");
+        return getWithEnvFallback("database.mysql.database", "MYSQL_DATABASE", "yopayment");
     }
 
     public String getDatabaseMySqlUser() {
-        return config.getString("database.mysql.username", "root");
+        return getWithEnvFallback("database.mysql.username", "MYSQL_USER", "root");
     }
 
     public String getDatabaseMySqlPassword() {
-        return config.getString("database.mysql.password", "password");
+        return getWithEnvFallback("database.mysql.password", "MYSQL_PASSWORD", "");
     }
 
     public int getDatabaseMySqlPoolSize() {
@@ -75,23 +96,31 @@ public class MainConfig {
     }
 
     public String getDatabasePostgresHost() {
-        return config.getString("database.postgresql.host", "localhost");
+        return getWithEnvFallback("database.postgresql.host", "POSTGRES_HOST", "localhost");
     }
 
     public int getDatabasePostgresPort() {
+        String envPort = System.getenv("POSTGRES_PORT");
+        if (envPort != null && !envPort.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(envPort);
+            } catch (NumberFormatException e) {
+                // Fallback на конфиг
+            }
+        }
         return config.getInt("database.postgresql.port", 5432);
     }
 
     public String getDatabasePostgresName() {
-        return config.getString("database.postgresql.database", "yopayment");
+        return getWithEnvFallback("database.postgresql.database", "POSTGRES_DATABASE", "yopayment");
     }
 
     public String getDatabasePostgresUser() {
-        return config.getString("database.postgresql.username", "postgres");
+        return getWithEnvFallback("database.postgresql.username", "POSTGRES_USER", "postgres");
     }
 
     public String getDatabasePostgresPassword() {
-        return config.getString("database.postgresql.password", "password");
+        return getWithEnvFallback("database.postgresql.password", "POSTGRES_PASSWORD", "");
     }
 
     public int getDatabasePostgresPoolSize() {

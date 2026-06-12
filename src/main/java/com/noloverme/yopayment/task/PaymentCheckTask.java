@@ -1,7 +1,6 @@
 package com.noloverme.yopayment.task;
 
 import com.noloverme.yopayment.api.YooKassaClient;
-import com.noloverme.yopayment.api.model.PaymentStatus;
 import com.noloverme.yopayment.api.model.PaymentResponse;
 import com.noloverme.yopayment.config.DonatesConfig;
 import com.noloverme.yopayment.config.MessagesConfig;
@@ -13,11 +12,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * Периодическая задача для проверки статуса платежей.
+ * Асинхронная задача для проверки статуса платежей.
+ * Выполняется периодически и обновляет статусы платежей через API ЮKassa.
  */
 public class PaymentCheckTask extends BukkitRunnable {
     private final DatabaseManager database;
@@ -47,6 +46,9 @@ public class PaymentCheckTask extends BukkitRunnable {
         });
     }
 
+    /**
+     * Обрабатывает один платёж: проверяет timeout и статус в API.
+     */
     private void processPayment(PaymentRecord record) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime timeoutTime = record.createdAt().plus(paymentTimeoutMinutes, ChronoUnit.MINUTES);
@@ -59,14 +61,17 @@ public class PaymentCheckTask extends BukkitRunnable {
             return;
         }
 
-        try {
-            PaymentResponse response = yooKassaClient.getPaymentStatus(record.paymentId());
-            handlePaymentStatus(record, response, now);
-        } catch (YooKassaClient.YooKassaException e) {
-            logger.warning("[YoPayment] Failed to check payment " + record.paymentId() + ": " + e.getMessage());
-        }
+        yooKassaClient.getPaymentStatus(record.paymentId())
+            .thenAccept(response -> handlePaymentStatus(record, response, now))
+            .exceptionally(ex -> {
+                logger.warning("[YoPayment] Failed to check payment " + record.paymentId() + ": " + ex.getMessage());
+                return null;
+            });
     }
 
+    /**
+     * Обрабатывает результат проверки статуса платежа.
+     */
     private void handlePaymentStatus(PaymentRecord record, PaymentResponse response, LocalDateTime now) {
         switch (response.status()) {
             case SUCCEEDED -> handleSucceeded(record, response, now);
@@ -75,8 +80,13 @@ public class PaymentCheckTask extends BukkitRunnable {
         }
     }
 
+    /**
+     * Обрабатывает успешно завершённый платёж.
+     * Выполняет команды и уведомляет игрока.
+     */
     private void handleSucceeded(PaymentRecord record, PaymentResponse response, LocalDateTime now) {
         logger.info("[YoPayment] Payment " + record.paymentId() + " succeeded! Executing commands for " + record.playerName() + "...");
+
         database.updatePaymentStatus(record.paymentId(), "succeeded", now, () -> {
             DonateItem item = donates.getItem(record.itemId()).orElse(null);
             if (item == null) {
@@ -85,16 +95,42 @@ public class PaymentCheckTask extends BukkitRunnable {
             }
 
             Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
-                for (String cmd : item.commands()) {
-                    String finalCmd = cmd.replace("%player%", record.playerName());
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalCmd);
-                }
-
+                executeCommands(item, record.playerName());
                 notifyPlayerIfOnline(record.playerName(), record.itemId(), "success");
             });
         });
     }
 
+    /**
+     * Безопасно выполняет команды с валидацией имени игрока.
+     */
+    private void executeCommands(DonateItem item, String playerName) {
+        for (String cmd : item.commands()) {
+            String finalCmd = replacePlayerPlaceholder(cmd, playerName);
+            try {
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalCmd);
+            } catch (Exception e) {
+                logger.severe("[YoPayment] Failed to execute command for player " + playerName + ": " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Заменяет плейсхолдер %player% на имя игрока с валидацией.
+     */
+    private String replacePlayerPlaceholder(String cmd, String playerName) {
+        if (!cmd.contains("%player%")) {
+            return cmd;
+        }
+
+        // Санитизируем имя перед подстановкой
+        String sanitizedName = playerName.replaceAll("[^a-zA-Z0-9_]", "_");
+        return cmd.replace("%player%", sanitizedName);
+    }
+
+    /**
+     * Обрабатывает отменённый платёж.
+     */
     private void handleCanceled(PaymentRecord record, LocalDateTime now) {
         logger.info("[YoPayment] Payment " + record.paymentId() + " canceled for player " + record.playerName());
         database.updatePaymentStatus(record.paymentId(), "canceled", now, () -> {
@@ -102,6 +138,9 @@ public class PaymentCheckTask extends BukkitRunnable {
         });
     }
 
+    /**
+     * Отправляет уведомление игроку если он онлайн.
+     */
     private void notifyPlayerIfOnline(String playerName, String itemId, String type) {
         Player player = Bukkit.getPlayer(playerName);
         if (player != null && player.isOnline()) {

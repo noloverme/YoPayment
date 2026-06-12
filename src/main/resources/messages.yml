@@ -25,6 +25,7 @@ payment-failed: "&#ff0000✘ Оплата товара &#ffff00{display_name}&#f
 
 item-not-found: "&#ff0000Товар &#ffff00{item}&#ff0000 не найден. Доступные: &#ffff00{items}"
 player-not-found: "&#ff0000Игрок &#ffff00{player}&#ff0000 не найден."
+invalid-player-name: "&#ff0000Некорректное имя игрока: &#ffff00{player}&#ff0000. Используйте только латинские буквы, цифры и подчёркивание (2-16 символов)."
 no-permission: "&#ff0000Недостаточно прав."
 payment-error: "&#ff0000Не удалось создать платёж. Обратитесь к администратору."
 only-player: "&#ff0000Эта команда доступна только игрокам."
