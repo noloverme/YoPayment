@@ -8,7 +8,6 @@ yookassa:
   shop-id: "000000"
 
   # Секретный ключ из личного кабинета ЮKassa
-  # ⚠️ НИКОГДА не коммитьте реальные ключи в git!
   # Рекомендуется: используй переменную окружения YOOKASSA_SECRET_KEY
   secret-key: "test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
