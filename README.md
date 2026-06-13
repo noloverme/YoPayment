@@ -270,7 +270,7 @@ src/main/java/com/noloverme/yopayment/
 # Требует Maven
 mvn clean package
 
-# JAR файл будет в target/YoPayment-1.0a.jar
+# JAR файл будет в target/YoPayment-1.0b.jar
 ```
 
 ### Зависимости
