@@ -127,7 +127,7 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         yooKassaClient.createPayment(donateItem, targetPlayer)
             .thenAccept(response -> handlePaymentCreated(sender, response, targetPlayer, donateItem, createdBy, args.length >= 3))
             .exceptionally(ex -> {
-                logger.severe("[YoPayment] Failed to create payment: " + ex.getMessage());
+                logger.severe("Failed to create payment: " + ex.getMessage());
                 Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
                     sendMessage(sender, messages.paymentError());
                 });

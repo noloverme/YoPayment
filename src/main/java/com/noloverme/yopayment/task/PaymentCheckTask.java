@@ -54,7 +54,7 @@ public class PaymentCheckTask extends BukkitRunnable {
         LocalDateTime timeoutTime = record.createdAt().plus(paymentTimeoutMinutes, ChronoUnit.MINUTES);
 
         if (now.isAfter(timeoutTime)) {
-            logger.info("[YoPayment] Payment " + record.paymentId() + " timed out for player " + record.playerName());
+            logger.info("Payment " + record.paymentId() + " timed out for player " + record.playerName());
             database.updatePaymentStatus(record.paymentId(), "canceled", now, () -> {
                 notifyPlayerIfOnline(record.playerName(), record.itemId(), "failed");
             });
@@ -64,7 +64,7 @@ public class PaymentCheckTask extends BukkitRunnable {
         yooKassaClient.getPaymentStatus(record.paymentId())
             .thenAccept(response -> handlePaymentStatus(record, response, now))
             .exceptionally(ex -> {
-                logger.warning("[YoPayment] Failed to check payment " + record.paymentId() + ": " + ex.getMessage());
+                logger.warning("Failed to check payment " + record.paymentId() + ": " + ex.getMessage());
                 return null;
             });
     }
@@ -85,12 +85,12 @@ public class PaymentCheckTask extends BukkitRunnable {
      * Выполняет команды и уведомляет игрока.
      */
     private void handleSucceeded(PaymentRecord record, PaymentResponse response, LocalDateTime now) {
-        logger.info("[YoPayment] Payment " + record.paymentId() + " succeeded! Executing commands for " + record.playerName() + "...");
+        logger.info("Payment " + record.paymentId() + " succeeded! Executing commands for " + record.playerName() + "...");
 
         database.updatePaymentStatus(record.paymentId(), "succeeded", now, () -> {
             DonateItem item = donates.getItem(record.itemId()).orElse(null);
             if (item == null) {
-                logger.warning("[YoPayment] Item " + record.itemId() + " not found for payment " + record.paymentId());
+                logger.warning("Item " + record.itemId() + " not found for payment " + record.paymentId());
                 return;
             }
 
@@ -110,7 +110,7 @@ public class PaymentCheckTask extends BukkitRunnable {
             try {
                 Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalCmd);
             } catch (Exception e) {
-                logger.severe("[YoPayment] Failed to execute command for player " + playerName + ": " + e.getMessage());
+                logger.severe("Failed to execute command for player " + playerName + ": " + e.getMessage());
             }
         }
     }
@@ -132,7 +132,7 @@ public class PaymentCheckTask extends BukkitRunnable {
      * Обрабатывает отменённый платёж.
      */
     private void handleCanceled(PaymentRecord record, LocalDateTime now) {
-        logger.info("[YoPayment] Payment " + record.paymentId() + " canceled for player " + record.playerName());
+        logger.info("Payment " + record.paymentId() + " canceled for player " + record.playerName());
         database.updatePaymentStatus(record.paymentId(), "canceled", now, () -> {
             notifyPlayerIfOnline(record.playerName(), record.itemId(), "failed");
         });

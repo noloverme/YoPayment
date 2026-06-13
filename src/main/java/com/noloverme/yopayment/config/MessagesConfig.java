@@ -33,6 +33,17 @@ public class MessagesConfig {
     }
 
     /**
+     * Возвращает строку с подставленными плейсхолдерами и без префикса.
+     */
+    public String getNP(String key) {
+        String raw = config.getString(key, "");
+        if (raw.isEmpty()) {
+            return "";
+        }
+        return TextUtil.hexToColor(raw);
+    }
+
+    /**
      * Возвращает строку без плейсхолдеров.
      */
     public String get(String key) {
@@ -141,19 +152,19 @@ public class MessagesConfig {
     }
 
     public String statusPending() {
-        return get("status-pending");
+        return getNP("status-pending");
     }
 
     public String statusSucceeded() {
-        return get("status-succeeded");
+        return getNP("status-succeeded");
     }
 
     public String statusCanceled() {
-        return get("status-canceled");
+        return getNP("status-canceled");
     }
 
     public String statusWaitingForCapture() {
-        return get("status-waiting_for_capture");
+        return getNP("status-waiting_for_capture");
     }
 
     public String help() {

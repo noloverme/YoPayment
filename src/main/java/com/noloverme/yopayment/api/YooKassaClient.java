@@ -56,7 +56,7 @@ public class YooKassaClient {
      */
     public CompletableFuture<PaymentResponse> createPayment(DonateItem item, String playerName) {
         return CompletableFuture.supplyAsync(() -> {
-            log("[YoPayment] Creating payment for player " + playerName + ", item: " + item.id() +
+            log("Creating payment for player " + playerName + ", item: " + item.id() +
                 ", price: " + item.price() + " RUB");
 
             PaymentCreateRequest request = new PaymentCreateRequest(
@@ -83,20 +83,20 @@ public class YooKassaClient {
                 HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
                 if (response.statusCode() >= 400) {
-                    logger.severe("[YoPayment] ERROR: Failed to create payment (HTTP " + response.statusCode() + ")");
+                    logger.severe("ERROR: Failed to create payment (HTTP " + response.statusCode() + ")");
                     throw new YooKassaException(response.statusCode(), "Failed to create payment");
                 }
 
                 PaymentResponse paymentResponse = PaymentResponse.fromJson(response.body());
-                log("[YoPayment] Payment created: id=" + paymentResponse.id() + ", status=" + paymentResponse.status().getValue());
+                log("Payment created: id=" + paymentResponse.id() + ", status=" + paymentResponse.status().getValue());
 
                 return paymentResponse;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.severe("[YoPayment] ERROR: Payment creation interrupted");
+                logger.severe("ERROR: Payment creation interrupted");
                 throw new YooKassaException(0, "Interrupted: " + e.getMessage());
             } catch (Exception e) {
-                logger.severe("[YoPayment] ERROR: " + e.getMessage());
+                logger.severe("ERROR: " + e.getMessage());
                 throw new YooKassaException(0, e.getMessage());
             }
         });
@@ -109,7 +109,7 @@ public class YooKassaClient {
      */
     public CompletableFuture<PaymentResponse> getPaymentStatus(String paymentId) {
         return CompletableFuture.supplyAsync(() -> {
-            log("[YoPayment] Checking payment status: id=" + paymentId);
+            log("Checking payment status: id=" + paymentId);
 
             try {
                 HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -123,20 +123,20 @@ public class YooKassaClient {
                 HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
                 if (response.statusCode() >= 400) {
-                    logger.severe("[YoPayment] ERROR: Failed to get payment status (HTTP " + response.statusCode() + ")");
+                    logger.severe("ERROR: Failed to get payment status (HTTP " + response.statusCode() + ")");
                     throw new YooKassaException(response.statusCode(), "Failed to get payment status");
                 }
 
                 PaymentResponse paymentResponse = PaymentResponse.fromJson(response.body());
-                log("[YoPayment] Payment " + paymentId + " status: " + paymentResponse.status().getValue());
+                log("Payment " + paymentId + " status: " + paymentResponse.status().getValue());
 
                 return paymentResponse;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.severe("[YoPayment] ERROR: Status check interrupted");
+                logger.severe("ERROR: Status check interrupted");
                 throw new YooKassaException(0, "Interrupted: " + e.getMessage());
             } catch (Exception e) {
-                logger.severe("[YoPayment] ERROR: " + e.getMessage());
+                logger.severe("ERROR: " + e.getMessage());
                 throw new YooKassaException(0, e.getMessage());
             }
         });

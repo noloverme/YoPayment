@@ -84,7 +84,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
             """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_yop_status ON yop_payments(status)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_yop_player ON yop_payments(player_name)");
-            logger.info("[YoPayment] Database initialized successfully");
+            logger.info("Database initialized successfully");
         }
     }
 
@@ -94,7 +94,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
             if (dataSource != null && !dataSource.isClosed()) {
                 dataSource.close();
                 dataSource = null;
-                logger.info("[YoPayment] Database connection pool closed");
+                logger.info("Database connection pool closed");
             }
         }
     }
@@ -123,7 +123,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
                 pstmt.executeUpdate();
                 if (onComplete != null) onComplete.run();
             } catch (SQLException e) {
-                logger.severe("[YoPayment] Failed to save payment: " + e.getMessage());
+                logger.severe("Failed to save payment: " + e.getMessage());
             }
         });
     }
@@ -141,7 +141,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
                 pstmt.executeUpdate();
                 if (onComplete != null) onComplete.run();
             } catch (SQLException e) {
-                logger.severe("[YoPayment] Failed to update payment status: " + e.getMessage());
+                logger.severe("Failed to update payment status: " + e.getMessage());
             }
         });
     }
@@ -161,7 +161,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                logger.severe("[YoPayment] Failed to get active payments: " + e.getMessage());
+                logger.severe("Failed to get active payments: " + e.getMessage());
             }
 
             if (callback != null) callback.accept(records);
@@ -183,7 +183,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                logger.severe("[YoPayment] Failed to get payments by player: " + e.getMessage());
+                logger.severe("Failed to get payments by player: " + e.getMessage());
             }
 
             if (callback != null) callback.accept(records);
@@ -205,7 +205,7 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                logger.severe("[YoPayment] Failed to get payment: " + e.getMessage());
+                logger.severe("Failed to get payment: " + e.getMessage());
             }
 
             if (callback != null) callback.accept(result);
