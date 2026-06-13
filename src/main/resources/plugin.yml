@@ -1,5 +1,5 @@
 name: YoPayment
-version: '1.0a'
+version: '${project.version}'
 main: com.noloverme.yopayment.YoPaymentPlugin
 api-version: '1.16'
 authors:
