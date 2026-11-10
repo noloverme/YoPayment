@@ -4,7 +4,7 @@ import com.noloverme.yopayment.config.MainConfig;
 import java.util.logging.Logger;
 
 /**
- * MySQL Database реализация с обязательным SSL-шифрованием.
+ * MySQL Database реализация с настраиваемым SSL-шифрованием.
  */
 public class MySQLDatabase extends AbstractSQLDatabase {
     private final String host;
@@ -13,6 +13,7 @@ public class MySQLDatabase extends AbstractSQLDatabase {
     private final String username;
     private final String password;
     private final int poolSize;
+    private final boolean ssl;
 
     public MySQLDatabase(MainConfig config, Logger logger) {
         super(logger);
@@ -22,13 +23,14 @@ public class MySQLDatabase extends AbstractSQLDatabase {
         this.username = config.getDatabaseMySqlUser();
         this.password = config.getDatabaseMySqlPassword();
         this.poolSize = config.getDatabaseMySqlPoolSize();
+        this.ssl = config.isDatabaseMySqlSsl();
     }
 
     @Override
     protected String getJdbcUrl() {
         return "jdbc:mysql://" + host + ":" + port + "/" + database
-            + "?useSSL=true"
-            + "&requireSSL=true"
+            + "?useSSL=" + ssl
+            + (ssl ? "&requireSSL=true" : "&allowPublicKeyRetrieval=true")
             + "&autoReconnect=true"
             + "&characterEncoding=UTF-8"
             + "&serverTimezone=UTC"

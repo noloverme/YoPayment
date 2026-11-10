@@ -2,6 +2,7 @@ package com.noloverme.yopayment.api;
 
 import com.noloverme.yopayment.api.model.PaymentCreateRequest;
 import com.noloverme.yopayment.api.model.PaymentResponse;
+import com.noloverme.yopayment.config.MainConfig;
 import com.noloverme.yopayment.model.DonateItem;
 import com.noloverme.yopayment.security.SecureCredentialManager;
 import com.google.gson.Gson;
@@ -16,28 +17,30 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 /**
- * HTTP-клиент для работы с ЮKassa API.
- * Обеспечивает безопасное хранение учётных данных и защиту от основных уязвимостей.
+ * HTTP-клиент для работы с ЮKassa API v3.
+ * Поддерживает создание платежей (включая чеки по 54-ФЗ), проверку статусов и ключи идемпотентности.
  */
 public class YooKassaClient {
     private static final String API_URL = "https://api.yookassa.ru/v3/payments";
-    private static final String USER_AGENT = "YoPayment/1.0a";
+    private static final String USER_AGENT = "YoPayment/1.0b";
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     private static final Gson gson = new Gson();
 
     private final SecureCredentialManager credentialManager;
+    private final MainConfig mainConfig;
     private final HttpClient httpClient;
     private final Logger logger;
     private final boolean silentMode;
 
-    public YooKassaClient(String shopId, String secretKey, String returnUrl, Logger logger) {
-        this(shopId, secretKey, returnUrl, logger, false);
-    }
-
-    public YooKassaClient(String shopId, String secretKey, String returnUrl, Logger logger, boolean silentMode) {
-        this.credentialManager = new SecureCredentialManager(shopId, secretKey, returnUrl);
+    public YooKassaClient(MainConfig mainConfig, Logger logger) {
+        this.mainConfig = mainConfig;
+        this.credentialManager = new SecureCredentialManager(
+            mainConfig.getShopId(),
+            mainConfig.getSecretKey(),
+            mainConfig.getReturnUrl()
+        );
         this.logger = logger;
-        this.silentMode = silentMode;
+        this.silentMode = mainConfig.isSilentMode();
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(TIMEOUT)
             .build();
@@ -59,12 +62,24 @@ public class YooKassaClient {
             log("Creating payment for player " + playerName + ", item: " + item.id() +
                 ", price: " + item.price() + " RUB");
 
+            PaymentCreateRequest.Receipt receipt = null;
+            if (mainConfig.isReceiptEnabled()) {
+                receipt = new PaymentCreateRequest.Receipt(
+                    mainConfig.getReceiptDefaultEmail(),
+                    item.displayName(),
+                    item.price(),
+                    mainConfig.getReceiptVatCode(),
+                    mainConfig.getReceiptTaxSystemCode()
+                );
+            }
+
             PaymentCreateRequest request = new PaymentCreateRequest(
                 item.price(),
                 credentialManager.getReturnUrl(),
                 item.description(),
                 playerName,
-                item.id()
+                item.id(),
+                receipt
             );
 
             String jsonBody = gson.toJson(request);
@@ -83,8 +98,8 @@ public class YooKassaClient {
                 HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
                 if (response.statusCode() >= 400) {
-                    logger.severe("ERROR: Failed to create payment (HTTP " + response.statusCode() + ")");
-                    throw new YooKassaException(response.statusCode(), "Failed to create payment");
+                    logger.severe("ERROR: Failed to create payment (HTTP " + response.statusCode() + "): " + response.body());
+                    throw new YooKassaException(response.statusCode(), "Failed to create payment: " + response.body());
                 }
 
                 PaymentResponse paymentResponse = PaymentResponse.fromJson(response.body());
@@ -123,7 +138,7 @@ public class YooKassaClient {
                 HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
                 if (response.statusCode() >= 400) {
-                    logger.severe("ERROR: Failed to get payment status (HTTP " + response.statusCode() + ")");
+                    logger.severe("ERROR: Failed to get payment status (HTTP " + response.statusCode() + "): " + response.body());
                     throw new YooKassaException(response.statusCode(), "Failed to get payment status");
                 }
 
@@ -144,17 +159,10 @@ public class YooKassaClient {
 
     /**
      * Генерирует Base64-кодированную пару учётных данных для Basic Auth.
-     * Secret key расшифровывается только в момент использования.
      */
     private String getBasicAuth() {
-        String secretKey = credentialManager.getSecretKey();
-        try {
-            String credentials = credentialManager.getShopId() + ":" + secretKey;
-            return Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-        } finally {
-            // Очищаем secret key из строки (Java GC это сделает)
-            java.util.Arrays.fill(secretKey.toCharArray(), '\0');
-        }
+        String credentials = credentialManager.getShopId() + ":" + credentialManager.getSecretKey();
+        return Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

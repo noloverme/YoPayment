@@ -191,6 +191,28 @@ public abstract class AbstractSQLDatabase implements DatabaseManager {
     }
 
     @Override
+    public void getPendingDeliveriesByPlayer(String playerName, Consumer<List<PaymentRecord>> callback) {
+        CompletableFuture.runAsync(() -> {
+            String sql = "SELECT * FROM yop_payments WHERE player_name = ? AND status = 'pending_delivery' ORDER BY created_at ASC";
+            List<PaymentRecord> records = new ArrayList<>();
+
+            try (Connection conn = getDataSource().getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, playerName);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        records.add(mapResultSet(rs));
+                    }
+                }
+            } catch (SQLException e) {
+                logger.severe("Failed to get pending deliveries for " + playerName + ": " + e.getMessage());
+            }
+
+            if (callback != null) callback.accept(records);
+        });
+    }
+
+    @Override
     public void getPayment(String paymentId, Consumer<Optional<PaymentRecord>> callback) {
         CompletableFuture.runAsync(() -> {
             String sql = "SELECT * FROM yop_payments WHERE payment_id = ?";

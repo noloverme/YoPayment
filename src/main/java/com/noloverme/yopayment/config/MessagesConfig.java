@@ -17,7 +17,7 @@ public class MessagesConfig {
     }
 
     private void loadPrefix() {
-        this.prefix = config.getString("prefix", "&#27ae60[&#00bfff YoPayment&#27ae60] ");
+        this.prefix = config.getString("prefix", "&#27ae60[&#00bfffYoPayment&#27ae60] ");
     }
 
     /**
@@ -78,8 +78,21 @@ public class MessagesConfig {
         ));
     }
 
+    public String paymentCreatedTarget(String itemId, String displayName, String price, String timeout) {
+        return get("payment-created-target", Map.of(
+            "item", itemId,
+            "display_name", displayName,
+            "price", price,
+            "timeout", timeout
+        ));
+    }
+
     public String paymentSuccess(String itemId, String displayName) {
         return get("payment-success", Map.of("item", itemId, "display_name", displayName));
+    }
+
+    public String paymentDelivered(String itemId, String displayName) {
+        return get("payment-delivered", Map.of("item", itemId, "display_name", displayName));
     }
 
     public String paymentFailed(String itemId, String displayName) {
@@ -151,8 +164,24 @@ public class MessagesConfig {
         return get("list-player-empty", Map.of("player", player));
     }
 
+    public String paymentLinkPrefix() {
+        return getNP("payment-link-prefix");
+    }
+
+    public String paymentLinkButton() {
+        return getNP("payment-link-button");
+    }
+
+    public String paymentLinkHover() {
+        return getNP("payment-link-hover");
+    }
+
     public String statusPending() {
         return getNP("status-pending");
+    }
+
+    public String statusPendingDelivery() {
+        return getNP("status-pending_delivery");
     }
 
     public String statusSucceeded() {
@@ -192,8 +221,10 @@ public class MessagesConfig {
     }
 
     public String getLocalizedStatus(String status) {
-        return switch (status) {
+        if (status == null) return "Unknown";
+        return switch (status.toLowerCase()) {
             case "pending" -> statusPending();
+            case "pending_delivery" -> statusPendingDelivery();
             case "succeeded" -> statusSucceeded();
             case "canceled" -> statusCanceled();
             case "waiting_for_capture" -> statusWaitingForCapture();

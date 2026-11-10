@@ -1,23 +1,26 @@
 # 💳 YoPayment
 
-> Плагин для создания платёжных ссылок через ЮKassa на Minecraft серверах
+> Плагин для создания платёжных ссылок через ЮKassa на Minecraft серверах (Paper 1.16+, Java 17)
+
 ---
 
 ## Обзор
 
-**YoPayment** — это мощный плагин для Minecraft серверов, который интегрирует платёжную систему ЮKassa. Позволяет администраторам создавать и управлять платёжными ссылками прямо из игры, а также отслеживать статус платежей в реальном времени.
+**YoPayment** — это надёжный плагин для Minecraft серверов (Paper 1.16–1.21+), который интегрирует платёжную систему **ЮKassa**. Позволяет игрокам и администраторам создавать платёжные ссылки прямо из игры, автоматически проверяет оплату и выдаёт донат в реальном времени или при следующем входе игрока на сервер.
 
 ---
 
 ## ✨ Основные возможности
 
-- 🔗 **Создание платёжных ссылок** — быстро генерируйте ссылки для оплаты через ЮKassa
-- 📊 **Отслеживание платежей** — автоматическая проверка статуса платежей
-- 🎁 **Система донатов** — гибкая конфигурация товаров и цен
-- 🗄️ **Множество БД** — поддержка H2, MySQL и PostgreSQL
-- 📝 **PlaceholderAPI** — встроенная интеграция с популярным плагином
-- 🌈 **Поддержка цветов** — HEX и стандартный формат Minecraft цветов
-- ⚙️ **Гибкая конфигурация** — подробные настройки через YAML файлы
+- 🔗 **Кликабельные ссылки в чате** — переход на оплату в один клик с красивым ховером
+- 📊 **Автоматическое отслеживание** — асинхронная проверка статуса в ЮKassa без спама API
+- 🛡️ **Защита от двойной выдачи** — предотвращение состояний гонки (Race conditions) при подтверждении
+- ⏳ **Очередь для офлайн-игроков** — если игрок оплатил, находясь офлайн, донат выдастся автоматически при его входе (`PlayerJoinEvent`)
+- 🧾 **Поддержка чеков по 54-ФЗ** — фискализация для самозанятых, ИП и юрлиц в ЮKassa
+- 🗄️ **Поддержка баз данных** — H2 (встроенная), MySQL (с поддержкой SSL и без) и PostgreSQL
+- ⚡ **Zero-Lag PlaceholderAPI** — моментальное чтение плейсхолдеров из памяти без зависания тиков сервера
+- 🌈 **Цвета и стили** — поддержка HEX (`&#RRGGBB`) и классических кодов (`&a`, `&c`)
+- 🔑 **Безопасность ключей** — поддержка чтения учетных данных через переменные окружения
 
 ---
 
@@ -25,309 +28,146 @@
 
 ### Требования
 
-- **Minecraft сервер**: Paper 1.16+
-- **Java**: 17+
-- **ЮKassa аккаунт**: с действительными shop-id и secret-key
+- **Minecraft сервер**: Paper / Purpur / Spigot **1.16+**
+- **Java**: **17+**
+- **ЮKassa аккаунт**: с действующими `shop-id` и `secret-key`
 
 ### Шаги установки
 
-1. Скачайте JAR файл плагина
-2. Поместите его в папку `/plugins`
-3. Перезагрузите сервер: `/reload confirm`
-4. Отредактируйте конфиг: `/plugins/YoPayment/config.yml`
-5. Перезагрузите конфиг: `/yopayment reload`
+1. Поместите JAR файл плагина в папку `/plugins/`.
+2. Перезагрузите сервер или загрузите плагин через менеджер плагинов.
+3. Отредактируйте конфиг: `/plugins/YoPayment/config.yml` (укажите ваш `shop-id` и `secret-key`).
+4. Настройте товары в `/plugins/YoPayment/donates.yml`.
+5. Перезагрузите конфиг: `/yopayment reload`.
 
 ```bash
-# Пример структуры папок
+# Структура файлов плагина
 plugins/
-├── YoPayment/
-│   ├── config.yml
-│   ├── messages.yml
-│   ├── donates.yml
-│   └── yopayment.db (H2 база)
+└── YoPayment/
+    ├── config.yml
+    ├── messages.yml
+    ├── donates.yml
+    └── yopayment.mv.db (встроенная H2 база)
 ```
 
 ---
 
-## Команды
+## Команды и права
 
-### Основные команды
+### Команды
 
-| Команда | Описание | Права доступа |
-|---------|---------|---------------|
-| `/yopayment create <player> <item>` | Создать ссылку оплаты для игрока | `yopayment.create.others` |
-| `/yopayment create <item>` | Создать ссылку оплаты для себя | `yopayment.create` |
-| `/yopayment reload` | Перезагрузить конфигурацию | `yopayment.reload` |
-| `/yopayment list [player]` | Просмотреть список платежей | `yopayment.list` |
-
-### Примеры использования
-
-```
-/yopayment create premium
-/yopayment create @nickname vip_pass
-/yopayment reload
-/yopayment list
-/yopayment list @nickname
-```
+| Команда | Описание | Право |
+|---|---|---|
+| `/yopayment create <товар>` | Создать ссылку на оплату для себя | `yopayment.create` |
+| `/yopayment create <товар> <игрок>` | Создать ссылку на оплату для другого игрока | `yopayment.create.others` |
+| `/yopayment reload` | Перезагрузить конфигурацию плагина | `yopayment.reload` |
+| `/yopayment list active` | Список всех активных неоплаченных счетов | `yopayment.list` |
+| `/yopayment list <игрок>` | История покупок конкретного игрока | `yopayment.list.others` (или свои при `yopayment.list`) |
 
 ### Алиасы
 
 - `/yp` — короткий алиас
 - `/yopay` — альтернативный алиас
 
+### Примеры использования
+
+```text
+/yp create vip
+/yp create premium Steve
+/yp list active
+/yp list Steve
+/yp reload
+```
+
 ---
 
 ## Конфигурация
 
-### config.yml
-
-Основной конфиг плагина:
+### `config.yml`
 
 ```yaml
-# API ЮKassa
+# Учётные данные ЮKassa
 yookassa:
-  shop-id: "000000"           # Ваш ID магазина
-  secret-key: "test_XXX"      # Секретный ключ
-  return-url: "https://example.com/"
+  shop-id: "000000"           # Ваш ID магазина (или ENV: YOOKASSA_SHOP_ID)
+  secret-key: "test_XXX"      # Секретный ключ (или ENV: YOOKASSA_SECRET_KEY)
+  return-url: "https://pay.example.com/"
 
-# Проверка платежей (в секундах)
-check-interval: 5
+# Интервалы проверки
+check-interval: 5             # Проверка статуса в секундах
+payment-timeout: 10           # Время жизни счёта в минутах
 
-# Время жизни платежа (в минутах)
-payment-timeout: 10
+silent-mode: true             # Тихий режим (только ошибки в консоли)
 
-# Формат сообщения при создании ссылки
-# Доступные плейсхолдеры: {display_name}, {price}, {url}
-message-format: "&7[&#00bfffОплата&7] &fТовар: &#00bfff{display_name}"
+# Чеки по 54-ФЗ (если в ЮKassa включена онлайн-касса)
+receipt:
+  enabled: false
+  default-email: "donate@example.com"
+  tax-system-code: 0          # Код СНО (1-6, 0 - не передавать)
+  vat-code: 1                 # 1 - без НДС, 2 - 0%, 4 - 20%
 
-# Режим логирования
-silent-mode: true
-
-# Выбор БД
+# База данных
 database:
-  type: h2              # h2, mysql или postgresql
-```
-
-### donates.yml
-
-Настройка товаров и цен:
-
-```yaml
-items:
-  premium:
-    display_name: "Premium Статус"
-    price: 99
-    description: "Месячный премиум доступ"
+  type: h2                    # h2, mysql, postgresql
   
-  vip_pass:
-    display_name: "VIP Пропуск"
-    price: 299
-    description: "Пожизненный VIP доступ"
-```
-
-### messages.yml
-
-Кастомные сообщения:
-
-```yaml
-not_found: "❌ Товар не найден"
-error: "⚠️ Ошибка при создании ссылки"
-success: "✅ Ссылка создана!"
-```
-
----
-
-## Placeholder-api
-
-**YoPayment** полностью совместим с PlaceholderAPI. Используйте плейсхолдеры в других плагинах:
-
-### Доступные плейсхолдеры
-
-#### `%YoPayment_Link%`
-Показывает последнюю рабочую ссылку для оплаты
-
-```
-/tell @nickname Ваша ссылка: %YoPayment_Link%
-```
-
-#### `%YoPayment_Custom:<format>%`
-Кастомный плейсхолдер с полной информацией о платеже
-
-**Доступные переменные:**
-- `{display_name}` — Название товара
-- `{item}` — ID товара
-- `{price}` — Цена (форматированная)
-- `{description}` — Описание товара
-- `{link}` — Ссылка на оплату
-- `{status}` — Статус платежа (pending, succeeded, canceled)
-- `{created_at}` — Дата создания
-
-**Примеры:**
-
-```
-%YoPayment_Custom:&#00bfffПоследняя покупка: {display_name} ({price})%
-%YoPayment_Custom:&cСтатус: &e{status}%
-%YoPayment_Custom:{description} - {price} руб.%
-```
-
----
-
-## Базы данных
-
-Плагин поддерживает три типа БД:
-
-### H2 (по умолчанию)
-Встроенная БД, не требует установки:
-
-```yaml
-database:
-  type: h2
   h2:
     file: "yopayment"
-```
-
-### MySQL
-
-```yaml
-database:
-  type: mysql
+    
   mysql:
     host: "localhost"
     port: 3306
     database: "yopayment"
     username: "root"
-    password: "password"
+    password: ""
+    ssl: false                # true/false
     pool-size: 10
 ```
 
-### PostgreSQL
+### `donates.yml`
 
 ```yaml
-database:
-  type: postgresql
-  postgresql:
-    host: "localhost"
-    port: 5432
-    database: "yopayment"
-    username: "postgres"
-    password: "password"
-    pool-size: 10
+donates:
+  vip:
+    display-name: "VIP"
+    price: 30.0
+    description: "Привилегия VIP на 30 дней"
+    commands:
+      - "lp user %player% parent add vip"
+      - "bc Игрок %player% приобрёл VIP!"
+
+  premium:
+    display-name: "Premium"
+    price: 60.0
+    description: "Привилегия Premium"
+    commands:
+      - "lp user %player% parent add premium"
 ```
 
 ---
 
-## Система прав
+## PlaceholderAPI
 
-| Право | Описание | По умолчанию |
-|-------|---------|-------------|
-| `yopayment.create` | Создавать ссылки для себя | OP |
-| `yopayment.create.others` | Создавать ссылки для других | OP |
-| `yopayment.reload` | Перезагружать конфиг | OP |
-| `yopayment.list` | Просматривать свои платежи | OP |
-| `yopayment.list.others` | Просматривать платежи других | OP |
+Плагин регистрирует экспансию `%YoPayment%`. Все данные берутся моментально из оперативной памяти без задержки основного потока сервера:
 
----
+| Плейсхолдер | Описание | Пример вывода |
+|---|---|---|
+| `%YoPayment_Link%` | Последняя активная ссылка игрока | `https://yookassa.ru/...` или `N/A` |
+| `%YoPayment_Custom:<формат>%` | Настраиваемый вывод последнего платежа | См. переменные ниже |
 
-## Архитектура
-
-### Структура проекта
-
-```
-src/main/java/com/noloverme/yopayment/
-├── YoPaymentPlugin.java           # Главный класс плагина
-├── api/
-│   ├── YooKassaClient.java        # Клиент ЮKassa API
-│   └── model/                     # Модели API
-├── command/
-│   └── YoPaymentCommand.java      # Обработчик команд
-├── config/
-│   ├── MainConfig.java            # Основная конфигурация
-│   ├── DonatesConfig.java         # Конфиг товаров
-│   └── MessagesConfig.java        # Кастомные сообщения
-├── database/
-│   ├── AbstractSQLDatabase.java   # Абстрактный класс БД
-│   ├── H2Database.java            # H2 реализация
-│   ├── MySQLDatabase.java         # MySQL реализация
-│   └── PostgreSQLDatabase.java    # PostgreSQL реализация
-├── model/
-│   ├── DonateItem.java            # Модель товара
-│   └── PaymentRecord.java         # Запись платежа
-├── task/
-│   └── PaymentCheckTask.java      # Асинхронная проверка платежей
-├── placeholder/
-│   └── YoPaymentPlaceholder.java  # PlaceholderAPI интеграция
-└── util/
-    └── TextUtil.java              # Утилиты для работы с текстом
-```
+### Переменные для `%YoPayment_Custom:<формат>%`:
+- `{display_name}` — Название товара
+- `{item}` — ID товара
+- `{price}` — Форматированная цена
+- `{description}` — Описание
+- `{link}` — Ссылка на оплату
+- `{status}` — Статус (`pending`, `pending_delivery`, `succeeded`, `canceled`)
+- `{created_at}` — Дата и время создания
 
 ---
 
-## Разработка
-
-### Сборка проекта
+## Сборка из исходников
 
 ```bash
-# Требует Maven
 mvn clean package
-
-# JAR файл будет в target/YoPayment-1.0b.jar
 ```
 
-### Зависимости
-
-- **Paper API 1.21.4** — Minecraft сервер API
-- **HikariCP 7.0.2** — Пулинг подключений к БД
-- **H2 2.4.240** — Встроенная база данных
-- **MySQL Connector 9.7.0** — MySQL драйвер
-- **PostgreSQL 42.7.11** — PostgreSQL драйвер
-- **Gson 2.14.0** — JSON парсер
-- **PlaceholderAPI 2.12.2** — Интеграция PlaceholderAPI
-
----
-
-## Статусы платежей
-
-| Статус | Описание |
-|--------|---------|
-| `pending` | ⏳ Платёж ожидает обработки |
-| `succeeded` | ✅ Платёж успешно завершён |
-| `canceled` | ❌ Платёж отменён пользователем или истёк срок |
-
----
-
-## Поиск неисправностей
-
-### Ссылка не создаётся
-1. Проверьте shop-id и secret-key в config.yml
-2. Убедитесь, что интернет соединение активно
-3. Проверьте логи: `silent-mode: false`
-
-### Платежи не отслеживаются
-1. Убедитесь, что check-interval > 0
-2. Проверьте права доступа в БД
-3. Перезагрузите плагин: `/yopayment reload`
-
-### PlaceholderAPI не работает
-1. Установите PlaceholderAPI плагин
-2. Убедитесь, что YoPayment загружен после PlaceholderAPI
-3. Перезагрузите сервер
-
----
-
-## Автор
-
-**noloverme** — разработчик плагина
-
----
-
-## Поддержка
-
-Если у вас есть вопросы или проблемы:
-
-1. 📖 Проверьте документацию выше
-2. 🐛 Посмотрите раздел [Поиск неисправностей](#поиск-неисправностей)
-3. 💬 Создайте issue на GitHub
-
----
-
-**Спасибо, что используете YoPayment!**
+Собранный JAR появится в папке `target/YoPayment-1.0b.jar`.

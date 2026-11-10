@@ -1,28 +1,34 @@
 package com.noloverme.yopayment;
 
 import com.noloverme.yopayment.api.YooKassaClient;
+import com.noloverme.yopayment.cache.PaymentCacheManager;
 import com.noloverme.yopayment.command.YoPaymentCommand;
 import com.noloverme.yopayment.config.DonatesConfig;
 import com.noloverme.yopayment.config.MainConfig;
 import com.noloverme.yopayment.config.MessagesConfig;
 import com.noloverme.yopayment.database.DatabaseFactory;
 import com.noloverme.yopayment.database.DatabaseManager;
+import com.noloverme.yopayment.listener.PlayerJoinListener;
 import com.noloverme.yopayment.placeholder.PlaceholderAPIHook;
 import com.noloverme.yopayment.task.PaymentCheckTask;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+
 import java.io.File;
 import java.sql.SQLException;
 
 /**
- * Главный класс плагина YoPayment.
+ * Главный класс плагина YoPayment (совместим с 1.16+ и Java 17).
  */
 public class YoPaymentPlugin extends JavaPlugin {
     private MainConfig mainConfig;
     private MessagesConfig messagesConfig;
     private DonatesConfig donatesConfig;
     private DatabaseManager databaseManager;
+    private PaymentCacheManager cacheManager;
     private YooKassaClient yooKassaClient;
     private PaymentCheckTask paymentCheckTask;
+    private PlaceholderAPIHook placeholderHook;
 
     @Override
     public void onEnable() {
@@ -35,9 +41,17 @@ public class YoPaymentPlugin extends JavaPlugin {
             saveResource("messages.yml", false);
             saveResource("donates.yml", false);
 
+            this.cacheManager = new PaymentCacheManager();
+
             reloadPlugin(getDataFolder());
 
-            getLogger().info("YoPayment v1.0a by noloverme enabled.");
+            // Регистрируем слушатель для отложенной выдачи и кэша
+            getServer().getPluginManager().registerEvents(
+                new PlayerJoinListener(this, databaseManager, cacheManager, donatesConfig, messagesConfig, getLogger()),
+                this
+            );
+
+            getLogger().info("YoPayment v1.0b enabled (compatible with 1.16+ & Java 17).");
         } catch (Exception e) {
             getLogger().severe("Failed to enable YoPayment: " + e.getMessage());
             e.printStackTrace();
@@ -50,10 +64,26 @@ public class YoPaymentPlugin extends JavaPlugin {
         try {
             if (paymentCheckTask != null) {
                 paymentCheckTask.cancel();
+                paymentCheckTask = null;
+            }
+
+            if (placeholderHook != null) {
+                placeholderHook.unregister();
+                placeholderHook = null;
+            }
+
+            if (yooKassaClient != null) {
+                yooKassaClient.shutdown();
+                yooKassaClient = null;
             }
 
             if (databaseManager != null) {
                 databaseManager.close();
+                databaseManager = null;
+            }
+
+            if (cacheManager != null) {
+                cacheManager.clear();
             }
 
             getLogger().info("YoPayment disabled.");
@@ -67,16 +97,14 @@ public class YoPaymentPlugin extends JavaPlugin {
         mainConfig = new MainConfig(getConfig());
 
         File messagesFile = new File(dataFolder, "messages.yml");
-        MessagesConfig tempMessages = new MessagesConfig(
+        messagesConfig = new MessagesConfig(
             org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(messagesFile)
         );
-        messagesConfig = tempMessages;
 
         File donatesFile = new File(dataFolder, "donates.yml");
-        DonatesConfig tempDonates = new DonatesConfig(
+        donatesConfig = new DonatesConfig(
             org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(donatesFile)
         );
-        donatesConfig = tempDonates;
 
         if (databaseManager != null) {
             databaseManager.close();
@@ -85,21 +113,20 @@ public class YoPaymentPlugin extends JavaPlugin {
         databaseManager = DatabaseFactory.create(mainConfig, dataFolder, getLogger());
         databaseManager.initialize();
 
-        yooKassaClient = new YooKassaClient(
-            mainConfig.getShopId(),
-            mainConfig.getSecretKey(),
-            mainConfig.getReturnUrl(),
-            getLogger(),
-            mainConfig.isSilentMode()
-        );
+        if (yooKassaClient != null) {
+            yooKassaClient.shutdown();
+        }
+        yooKassaClient = new YooKassaClient(mainConfig, getLogger());
 
         if (paymentCheckTask != null) {
             paymentCheckTask.cancel();
         }
 
         paymentCheckTask = new PaymentCheckTask(
+            this,
             databaseManager,
             yooKassaClient,
+            cacheManager,
             messagesConfig,
             donatesConfig,
             mainConfig.getPaymentTimeout(),
@@ -110,8 +137,10 @@ public class YoPaymentPlugin extends JavaPlugin {
         paymentCheckTask.runTaskTimerAsynchronously(this, 0, intervalTicks);
 
         YoPaymentCommand commandExecutor = new YoPaymentCommand(
+            this,
             databaseManager,
             yooKassaClient,
+            cacheManager,
             mainConfig,
             messagesConfig,
             donatesConfig,
@@ -119,16 +148,23 @@ public class YoPaymentPlugin extends JavaPlugin {
             getLogger()
         );
 
-        getCommand("yopayment").setExecutor(commandExecutor);
-        getCommand("yopayment").setTabCompleter(commandExecutor);
+        PluginCommand cmd = getCommand("yopayment");
+        if (cmd != null) {
+            cmd.setExecutor(commandExecutor);
+            cmd.setTabCompleter(commandExecutor);
+        }
 
-        registerPlaceholders(databaseManager, donatesConfig);
+        registerPlaceholders();
     }
 
-    private void registerPlaceholders(DatabaseManager databaseManager, DonatesConfig donatesConfig) {
+    private void registerPlaceholders() {
         try {
             if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
-                new PlaceholderAPIHook(databaseManager, donatesConfig, getLogger()).register();
+                if (placeholderHook != null) {
+                    placeholderHook.unregister();
+                }
+                placeholderHook = new PlaceholderAPIHook(databaseManager, donatesConfig, cacheManager, getLogger());
+                placeholderHook.register();
             }
         } catch (Exception e) {
             getLogger().warning("Failed to register PlaceholderAPI: " + e.getMessage());
@@ -149,6 +185,10 @@ public class YoPaymentPlugin extends JavaPlugin {
 
     public DatabaseManager getDatabaseManager() {
         return databaseManager;
+    }
+
+    public PaymentCacheManager getCacheManager() {
+        return cacheManager;
     }
 
     public YooKassaClient getYooKassaClient() {

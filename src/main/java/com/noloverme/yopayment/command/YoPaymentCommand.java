@@ -2,6 +2,7 @@ package com.noloverme.yopayment.command;
 
 import com.noloverme.yopayment.YoPaymentPlugin;
 import com.noloverme.yopayment.api.YooKassaClient;
+import com.noloverme.yopayment.cache.PaymentCacheManager;
 import com.noloverme.yopayment.config.DonatesConfig;
 import com.noloverme.yopayment.config.MainConfig;
 import com.noloverme.yopayment.config.MessagesConfig;
@@ -25,21 +26,25 @@ import java.util.stream.Collectors;
 
 /**
  * Обработчик команды /yopayment.
- * Поддерживает создание платежей, перезагрузку конфига и просмотр платежей.
+ * Поддерживает создание платежей, интерактивные кликабельные ссылки, перезагрузку конфига и просмотр платежей.
  */
 public class YoPaymentCommand implements CommandExecutor, TabCompleter {
+    private final YoPaymentPlugin plugin;
     private final DatabaseManager database;
     private final YooKassaClient yooKassaClient;
+    private final PaymentCacheManager cacheManager;
     private final MessagesConfig messages;
     private final DonatesConfig donates;
     private final int paymentTimeout;
     private final Logger logger;
 
-    public YoPaymentCommand(DatabaseManager database, YooKassaClient yooKassaClient,
-                            MainConfig mainConfig, MessagesConfig messages, DonatesConfig donates,
-                            int paymentTimeout, Logger logger) {
+    public YoPaymentCommand(YoPaymentPlugin plugin, DatabaseManager database, YooKassaClient yooKassaClient,
+                            PaymentCacheManager cacheManager, MainConfig mainConfig, MessagesConfig messages,
+                            DonatesConfig donates, int paymentTimeout, Logger logger) {
+        this.plugin = plugin;
         this.database = database;
         this.yooKassaClient = yooKassaClient;
+        this.cacheManager = cacheManager;
         this.messages = messages;
         this.donates = donates;
         this.paymentTimeout = paymentTimeout;
@@ -100,12 +105,15 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         }
 
         String targetPlayer;
+        boolean isForOther = false;
+
         if (args.length >= 3) {
             if (!sender.hasPermission("yopayment.create.others")) {
                 sendMessage(sender, messages.noPermission());
                 return true;
             }
             targetPlayer = args[2];
+            isForOther = true;
         } else {
             if (!(sender instanceof Player)) {
                 sendMessage(sender, messages.onlyPlayer());
@@ -123,12 +131,17 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         String createdBy = sender instanceof Player ? ((Player) sender).getName() : "Console";
         DonateItem donateItem = item.get();
 
-        // Создание платежа
+        // Получаем UUID онлайн-игрока
+        Player onlineTarget = Bukkit.getPlayerExact(targetPlayer);
+        String targetUuid = onlineTarget != null ? onlineTarget.getUniqueId().toString() : null;
+
+        // Создание платежа в ЮKassa
+        boolean forOtherFinal = isForOther;
         yooKassaClient.createPayment(donateItem, targetPlayer)
-            .thenAccept(response -> handlePaymentCreated(sender, response, targetPlayer, donateItem, createdBy, args.length >= 3))
+            .thenAccept(response -> handlePaymentCreated(sender, response, targetPlayer, targetUuid, donateItem, createdBy, forOtherFinal))
             .exceptionally(ex -> {
                 logger.severe("Failed to create payment: " + ex.getMessage());
-                Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
+                Bukkit.getScheduler().runTask(plugin, () -> {
                     sendMessage(sender, messages.paymentError());
                 });
                 return null;
@@ -141,11 +154,11 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
      * Обрабатывает результат создания платежа.
      */
     private void handlePaymentCreated(CommandSender sender, PaymentResponse response, String targetPlayer,
-                                      DonateItem donateItem, String createdBy, boolean isForOther) {
+                                      String targetUuid, DonateItem donateItem, String createdBy, boolean isForOther) {
         PaymentRecord record = new PaymentRecord(
             response.id(),
             targetPlayer,
-            null,
+            targetUuid,
             donateItem.id(),
             donateItem.price(),
             response.status().getValue(),
@@ -156,31 +169,57 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         );
 
         database.savePayment(record, () -> {
-            Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
+            cacheManager.updateLatestPayment(record);
+
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                String priceFormatted = TextUtil.formatPrice(donateItem.price());
+                String linkPrefix = messages.paymentLinkPrefix();
+                String linkButton = messages.paymentLinkButton();
+                String linkHover = messages.paymentLinkHover();
+
                 if (isForOther) {
+                    // Сообщение инициатору (админу)
                     sendMessage(sender, messages.paymentCreatedForOther(
                         targetPlayer,
                         donateItem.id(),
                         donateItem.displayName(),
-                        TextUtil.formatPrice(donateItem.price())
+                        priceFormatted
                     ));
+
+                    if (response.confirmationUrl() != null) {
+                        TextUtil.sendClickableLink(sender, linkPrefix, linkButton, response.confirmationUrl(), linkHover);
+                    }
+
+                    // Если целевой игрок онлайн — отправляем ссылку и ему!
+                    Player target = Bukkit.getPlayerExact(targetPlayer);
+                    if (target != null && target.isOnline() && !target.equals(sender)) {
+                        sendMessage(target, messages.paymentCreatedTarget(
+                            donateItem.id(),
+                            donateItem.displayName(),
+                            priceFormatted,
+                            String.valueOf(paymentTimeout)
+                        ));
+                        if (response.confirmationUrl() != null) {
+                            TextUtil.sendClickableLink(target, linkPrefix, linkButton, response.confirmationUrl(), linkHover);
+                        }
+                    }
                 } else {
                     sendMessage(sender, messages.paymentCreated(
                         donateItem.id(),
                         donateItem.displayName(),
-                        TextUtil.formatPrice(donateItem.price()),
+                        priceFormatted,
                         String.valueOf(paymentTimeout)
                     ));
-                }
-                if (response.confirmationUrl() != null) {
-                    sendMessage(sender, "&#a0a0a0Ссылка: " + response.confirmationUrl());
+                    if (response.confirmationUrl() != null) {
+                        TextUtil.sendClickableLink(sender, linkPrefix, linkButton, response.confirmationUrl(), linkHover);
+                    }
                 }
             });
         });
     }
 
     /**
-     * Обрабатывает перезагрузку конфигурации с ошибками.
+     * Обрабатывает перезагрузку конфигурации.
      */
     private boolean handleReload(CommandSender sender) {
         if (!sender.hasPermission("yopayment.reload")) {
@@ -189,14 +228,9 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         }
 
         try {
-            YoPaymentPlugin plugin = (YoPaymentPlugin) Bukkit.getPluginManager().getPlugin("YoPayment");
-            if (plugin != null) {
-                plugin.reloadConfig();
-                plugin.reloadPlugin(plugin.getDataFolder());
-                sendMessage(sender, messages.configReloaded());
-            } else {
-                sendMessage(sender, "&#ff0000Плагин YoPayment не найден");
-            }
+            plugin.reloadConfig();
+            plugin.reloadPlugin(plugin.getDataFolder());
+            sendMessage(sender, messages.configReloaded());
         } catch (Exception e) {
             logger.severe("Error reloading YoPayment config: " + e.getMessage());
             sendMessage(sender, "&#ff0000Ошибка при перезагрузке конфигурации: " + e.getMessage());
@@ -222,9 +256,9 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
 
         if ("active".equals(listType)) {
             database.getActivePayments(payments -> {
-                Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
+                Bukkit.getScheduler().runTask(plugin, () -> {
                     sendMessage(sender, messages.listActiveHeader());
-                    if (payments.isEmpty()) {
+                    if (payments == null || payments.isEmpty()) {
                         sendMessage(sender, messages.listActiveEmpty());
                     } else {
                         for (PaymentRecord payment : payments) {
@@ -243,15 +277,15 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         } else {
             String playerName = listType;
 
-            if (!sender.hasPermission("yopayment.list.others") && !playerName.equals(sender.getName())) {
+            if (!sender.hasPermission("yopayment.list.others") && !playerName.equalsIgnoreCase(sender.getName())) {
                 sendMessage(sender, messages.noPermission());
                 return true;
             }
 
             database.getPaymentsByPlayer(playerName, payments -> {
-                Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("YoPayment"), () -> {
+                Bukkit.getScheduler().runTask(plugin, () -> {
                     sendMessage(sender, messages.listPlayerHeader(playerName));
-                    if (payments.isEmpty()) {
+                    if (payments == null || payments.isEmpty()) {
                         sendMessage(sender, messages.listPlayerEmpty(playerName));
                     } else {
                         for (PaymentRecord payment : payments) {
@@ -280,10 +314,10 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2) {
-            if ("create".equals(args[0].toLowerCase())) {
+            if ("create".equalsIgnoreCase(args[0])) {
                 return new ArrayList<>(donates.getItemIds());
             }
-            if ("list".equals(args[0].toLowerCase())) {
+            if ("list".equalsIgnoreCase(args[0])) {
                 List<String> completions = new ArrayList<>(List.of("active"));
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     completions.add(player.getName());
@@ -292,7 +326,7 @@ public class YoPaymentCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        if (args.length == 3 && "create".equals(args[0].toLowerCase())) {
+        if (args.length == 3 && "create".equalsIgnoreCase(args[0])) {
             return Bukkit.getOnlinePlayers().stream()
                 .map(Player::getName)
                 .collect(Collectors.toList());

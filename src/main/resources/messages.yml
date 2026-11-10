@@ -17,7 +17,18 @@ payment-created-for-other: |
   &#a0a0a0Товар: &#ffff00{display_name}
   &#a0a0a0Цена: &#ffd700{price} ₽
 
+payment-created-target: |
+  &#27ae60Вам выставлен счёт на оплату товара &#ffff00{display_name}&#27ae60!
+  &#a0a0a0Цена: &#ffd700{price} ₽
+  &#a0a0a0Ссылка действует {timeout} мин.
+
+payment-link-prefix: "&#a0a0a0Ссылка: "
+payment-link-button: "&#00bfff[Нажмите здесь для оплаты]"
+payment-link-hover: "&#a0a0a0Нажмите, чтобы перейти на страницу оплаты ЮKassa"
+
 payment-success: "&#27ae60✔ Оплата товара &#ffff00{display_name}&#27ae60 прошла успешно! Спасибо!"
+
+payment-delivered: "&#27ae60✔ Ваш оплаченный товар &#ffff00{display_name}&#27ae60 успешно выдан! Приятной игры!"
 
 payment-failed: "&#ff0000✘ Оплата товара &#ffff00{display_name}&#ff0000 была отменена или истекла."
 
@@ -27,7 +38,7 @@ item-not-found: "&#ff0000Товар &#ffff00{item}&#ff0000 не найден. Д
 player-not-found: "&#ff0000Игрок &#ffff00{player}&#ff0000 не найден."
 invalid-player-name: "&#ff0000Некорректное имя игрока: &#ffff00{player}&#ff0000. Используйте только латинские буквы, цифры и подчёркивание (2-16 символов)."
 no-permission: "&#ff0000Недостаточно прав."
-payment-error: "&#ff0000Не удалось создать платёж. Обратитесь к администратору."
+payment-error: "&#ff0000Не удалось создать платёж. Проверьте настройки shop-id / secret-key в config.yml или обратитесь к администратору."
 only-player: "&#ff0000Эта команда доступна только игрокам."
 unknown-subcommand: "&#ff0000Неизвестная подкоманда. Используйте /yopayment"
 
@@ -50,6 +61,7 @@ list-player-empty: "&#a0a0a0У игрока &#ffff00{player}&#a0a0a0 нет по
 # --- Локализация статусов ---
 
 status-pending: "&#ffff00Ожидание"
+status-pending_delivery: "&#ffaa00Ожидает выдачи"
 status-succeeded: "&#27ae60Оплачено"
 status-canceled: "&#ff0000Отменено"
 status-waiting_for_capture: "&#ffd700Ожидание списания"

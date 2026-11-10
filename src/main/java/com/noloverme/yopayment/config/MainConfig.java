@@ -39,15 +39,11 @@ public class MainConfig {
     }
 
     public int getCheckInterval() {
-        return config.getInt("check-interval", 5);
+        return Math.max(1, config.getInt("check-interval", 5));
     }
 
     public int getPaymentTimeout() {
-        return config.getInt("payment-timeout", 10);
-    }
-
-    public String getMessageFormat() {
-        return config.getString("message-format", "{display_name} ({price} ₽): {url}");
+        return Math.max(1, config.getInt("payment-timeout", 10));
     }
 
     public boolean isSilentMode() {
@@ -72,8 +68,7 @@ public class MainConfig {
         if (envPort != null && !envPort.trim().isEmpty()) {
             try {
                 return Integer.parseInt(envPort);
-            } catch (NumberFormatException e) {
-                // Fallback на конфиг
+            } catch (NumberFormatException ignored) {
             }
         }
         return config.getInt("database.mysql.port", 3306);
@@ -91,6 +86,14 @@ public class MainConfig {
         return getWithEnvFallback("database.mysql.password", "MYSQL_PASSWORD", "");
     }
 
+    public boolean isDatabaseMySqlSsl() {
+        String envSsl = System.getenv("MYSQL_SSL");
+        if (envSsl != null && !envSsl.trim().isEmpty()) {
+            return Boolean.parseBoolean(envSsl);
+        }
+        return config.getBoolean("database.mysql.ssl", false);
+    }
+
     public int getDatabaseMySqlPoolSize() {
         return config.getInt("database.mysql.pool-size", 10);
     }
@@ -104,8 +107,7 @@ public class MainConfig {
         if (envPort != null && !envPort.trim().isEmpty()) {
             try {
                 return Integer.parseInt(envPort);
-            } catch (NumberFormatException e) {
-                // Fallback на конфиг
+            } catch (NumberFormatException ignored) {
             }
         }
         return config.getInt("database.postgresql.port", 5432);
@@ -125,5 +127,22 @@ public class MainConfig {
 
     public int getDatabasePostgresPoolSize() {
         return config.getInt("database.postgresql.pool-size", 10);
+    }
+
+    // 54-ФЗ Чеки
+    public boolean isReceiptEnabled() {
+        return config.getBoolean("receipt.enabled", false);
+    }
+
+    public String getReceiptDefaultEmail() {
+        return config.getString("receipt.default-email", "donate@example.com");
+    }
+
+    public int getReceiptTaxSystemCode() {
+        return config.getInt("receipt.tax-system-code", 0);
+    }
+
+    public int getReceiptVatCode() {
+        return config.getInt("receipt.vat-code", 1);
     }
 }

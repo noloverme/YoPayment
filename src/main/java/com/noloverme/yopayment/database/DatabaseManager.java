@@ -45,4 +45,9 @@ public interface DatabaseManager {
      * Получает платёж по ID асинхронно.
      */
     void getPayment(String paymentId, Consumer<Optional<PaymentRecord>> callback);
+
+    /**
+     * Получает ожидающие выдачи платежи для игрока (когда он был офлайн).
+     */
+    void getPendingDeliveriesByPlayer(String playerName, Consumer<List<PaymentRecord>> callback);
 }
